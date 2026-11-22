@@ -1,0 +1,64 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      function ownsProfile() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      allow get: if ownsProfile();
+
+      allow create: if ownsProfile()
+        && request.resource.data.keys().hasAll([
+          'uid', 'firstName', 'lastName', 'role', 'registrationDateTime'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'uid', 'firstName', 'lastName', 'role', 'registrationDateTime'
+        ])
+        && request.resource.data.uid == uid
+        && request.resource.data.firstName is string
+        && request.resource.data.firstName.size() > 0
+        && request.resource.data.lastName is string
+        && request.resource.data.lastName.size() > 0
+        && request.resource.data.role == 'member'
+        && request.resource.data.registrationDateTime == request.time;
+    }
+
+    match /messages/{messageId} {
+      function ownsMessage() {
+        return request.auth != null
+          && resource.data.authorUid == request.auth.uid;
+      }
+
+      function validText() {
+        return request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 500;
+      }
+
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasAll([
+          'authorUid', 'authorName', 'text', 'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'authorUid', 'authorName', 'text', 'createdAt'
+        ])
+        && request.resource.data.authorUid == request.auth.uid
+        && request.resource.data.authorName is string
+        && request.resource.data.authorName.size() > 0
+        && validText()
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if ownsMessage()
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['text', 'editedAt'])
+        && validText()
+        && request.resource.data.editedAt == request.time;
+
+      allow delete: if ownsMessage();
+    }
+  }
+}
