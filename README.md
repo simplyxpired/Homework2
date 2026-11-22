@@ -45,13 +45,6 @@ With the Firestore emulator running, run these commands from the project folder:
 ### Spice #4 — Preventing duplicate posts
 
 Each post attempt uses one message ID. If the app retries and Firestore already has a message with that ID, it skips creating another one.
-
-Run this from the project folder to test two attempts with the same ID:
-
-
-flutter run --dart-define=USE_FIREBASE_EMULATORS=true --dart-define=TEST_DUPLICATE_POST=true
-
-
 Tap Post once, check the message ID in the Flutter terminal, and verify that local Firestore shows one document for that test post.
 
 
