@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'board_service.dart';
@@ -25,7 +26,13 @@ class _BoardScreenState extends State<BoardScreen> {
 
   bool _posting = false;
   bool _changingMessage = false;
+  String? _pendingMessageId;
   String? _error;
+
+  static const _testDuplicatePost =
+      kDebugMode &&
+      bool.fromEnvironment('USE_FIREBASE_EMULATORS') &&
+      bool.fromEnvironment('TEST_DUPLICATE_POST');
 
   @override
   void initState() {
@@ -54,11 +61,25 @@ class _BoardScreenState extends State<BoardScreen> {
     });
 
     try {
-      await widget.board.postMessage(
-        authorUid: widget.uid,
-        authorName: widget.authorName,
-        text: text,
-      );
+      final messageId = _pendingMessageId ??= widget.board.newMessageId();
+
+      Future<void> submit() {
+        return widget.board.postMessage(
+          messageId: messageId,
+          authorUid: widget.uid,
+          authorName: widget.authorName,
+          text: text,
+        );
+      }
+
+      await submit();
+
+      if (_testDuplicatePost) {
+        await submit();
+        debugPrint('Duplicate test submitted the same message ID twice: $messageId');
+      }
+
+      _pendingMessageId = null;
       if (mounted) _message.clear();
     } on FirebaseException catch (error) {
       if (!mounted) return;
@@ -118,10 +139,7 @@ class _BoardScreenState extends State<BoardScreen> {
     if (!mounted || newText == null || newText == originalText) return;
 
     await _changeMessage(
-      () => widget.board.editMessage(
-        messageId: messageId,
-        newText: newText,
-      ),
+      () => widget.board.editMessage(messageId: messageId, newText: newText),
     );
   }
 
@@ -242,6 +260,7 @@ class _BoardScreenState extends State<BoardScreen> {
                   controller: _message,
                   enabled: !_posting,
                   maxLength: 500,
+                  onChanged: (_) => _pendingMessageId = null,
                   decoration: InputDecoration(
                     labelText: 'Message',
                     errorText: _error,

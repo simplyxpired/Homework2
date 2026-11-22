@@ -24,16 +24,28 @@ class BoardService {
     });
   }
 
+  String newMessageId() {
+    return _db.collection('messages').doc().id;
+  }
+
   Future<void> postMessage({
+    required String messageId,
     required String authorUid,
     required String authorName,
     required String text,
   }) async {
-    await _db.collection('messages').add({
-      'authorUid': authorUid,
-      'authorName': authorName,
-      'text': text,
-      'createdAt': FieldValue.serverTimestamp(),
+    final message = _db.collection('messages').doc(messageId);
+
+    await _db.runTransaction((transaction) async {
+      final existing = await transaction.get(message);
+      if (existing.exists) return;
+
+      transaction.set(message, {
+        'authorUid': authorUid,
+        'authorName': authorName,
+        'text': text,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 
